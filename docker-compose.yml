@@ -1,0 +1,22 @@
+services:
+  web:
+    image: ghcr.io/ukewea/receipt-task-printer:main
+    ports:
+      # Format: "HOST:CONTAINER". Keep in sync with WEB_APP_PORT.
+      - "8000:8000"
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      WEB_APP_HOST: "0.0.0.0"
+      # Must match the container-side port in the mapping above.
+      WEB_APP_PORT: "8000"
+      PRINTER_HOST: "10.43.0.144"
+      PRINTER_CUT_FEED: "1"
+      PRINTER_IMAGE_WIDTH: "576"
+      RETAIN_TICKET_FILES: "false"
+      TICKET_PADDING_TOP: "5"
+      TICKET_PADDING_RIGHT: "0"
