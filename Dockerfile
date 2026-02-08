@@ -6,6 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
+ENV PYTHONPATH=/app/src
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
