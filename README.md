@@ -44,6 +44,21 @@ uv run web-print
 
 Then open `http://127.0.0.1:8000`.
 
+## Container
+
+Build locally:
+
+```bash
+docker build -t receipt-printer-web .
+docker run --rm -p 8000:8000 \\
+  -e PRINTER_HOST=192.168.2.120 \\
+  -e PRINTER_CUT_FEED=true \\
+  -e PRINTER_IMAGE_WIDTH=576 \\
+  receipt-printer-web
+```
+
+GitHub Actions builds and pushes to GHCR on `main` and tags. The image name is `ghcr.io/<owner>/<repo>`.
+
 ## Notes
 
 - Ticket rendering uses `imgkit` (wkhtmltoimage) with a Selenium fallback. Install one of these toolchains if rendering fails.
