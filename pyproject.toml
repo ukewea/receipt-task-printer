@@ -1,0 +1,40 @@
+[project]
+name = "receipt-printer-web"
+version = "0.1.0"
+description = "Minimal FastAPI-style web UI for printing tasks to a thermal receipt printer"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "CodingWithLewis" }]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "python-multipart",
+    "pillow",
+    "python-escpos",
+    "imgkit",
+    "selenium",
+]
+
+[project.scripts]
+web-print = "task_card_generator.web_app:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
