@@ -47,3 +47,11 @@ def test_print_success_with_json(monkeypatch):
     assert data["success"] is True
     assert data["task"]["name"] == "Test task"
     assert printed["called"] is True
+
+
+def test_image_only_requires_attachment(monkeypatch):
+    client = TestClient(web_app.app)
+    resp = client.post("/print", data={"image_only": "on"})
+    assert resp.status_code == 400
+    data = resp.json()
+    assert data["success"] is False

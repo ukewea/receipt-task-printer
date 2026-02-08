@@ -20,6 +20,7 @@ load_dotenv()
 RETAIN_TICKET_FILES = os.getenv("RETAIN_TICKET_FILES", "false").lower() not in {"false", "0", "no"}
 WEB_APP_HOST = os.getenv("WEB_APP_HOST", "127.0.0.1")
 WEB_APP_PORT = int(os.getenv("WEB_APP_PORT", "8000"))
+PRINTER_IMAGE_WIDTH = int(os.getenv("PRINTER_IMAGE_WIDTH", "576"))
 HISTORY_LIMIT = 10
 _history = deque(maxlen=HISTORY_LIMIT)
 
@@ -87,6 +88,11 @@ FORM_HTML = """
 
       .row-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: end; }
       .attachment-block { display: grid; gap: 0.4rem; }
+      .mode-toggle { display: grid; gap: 0.5rem; }
+      .toggle-row { display: flex; gap: 0.75rem; align-items: center; }
+      .toggle-row input { transform: translateY(1px); }
+      .toggle-help { color: #6b7280; font-size: 0.95rem; }
+      .dimmed { opacity: 0.55; }
       .dropzone {
         border: 2px dashed #d1d5db;
         border-radius: 8px;
@@ -125,6 +131,13 @@ FORM_HTML = """
       <h1>Print a Task</h1>
       <p class="msg">Enter a task and click Print! It will render a ticket and send it to your configured thermal printer.</p>
       <form id="print-form">
+        <div class="mode-toggle">
+          <div class="toggle-row">
+            <input type="checkbox" id="image_only" name="image_only" />
+            <label for="image_only">Image-only print (skip the ticket layout)</label>
+          </div>
+          <div class="toggle-help" id="mode-help">Attach an image below to print it directly.</div>
+        </div>
         <label>
           Task name
           <input type="text" name="name" id="name" required placeholder="e.g., Pick up dry cleaning" />
@@ -215,6 +228,14 @@ FORM_HTML = """
       const dropzone = document.getElementById('dropzone');
       const attachmentPreview = document.getElementById('attachment-preview');
       const attachmentPreviewImg = document.getElementById('attachment-preview-img');
+      const imageOnlyToggle = document.getElementById('image_only');
+      const taskNameInput = document.getElementById('name');
+      const modeHelp = document.getElementById('mode-help');
+      const priorityGroup = document.querySelector('.priority-group');
+      const dueDateLabel = dueDateInput.closest('label');
+      const operatorSignatureInput = document.getElementById('operator_signature');
+      const operatorSignatureLabel = operatorSignatureInput.closest('label');
+      const attachmentLabel = attachmentInput.closest('label');
 
       const priorityLabels = { '1': 'High', '2': 'Medium', '3': 'Low' };
       const priorityGlyphs = { '1': '⚡⚡⚡', '2': '⚡⚡', '3': '⚡' };
@@ -243,12 +264,44 @@ FORM_HTML = """
         }
       }
 
+      function applyImageOnlyMode() {
+        const isImageOnly = imageOnlyToggle.checked;
+        taskNameInput.required = !isImageOnly;
+        dueDateInput.required = !isImageOnly;
+        if (isImageOnly) {
+          taskNameInput.value = '';
+          taskNameInput.setAttribute('disabled', 'disabled');
+          taskNameInput.parentElement.classList.add('dimmed');
+          dueDateInput.setAttribute('disabled', 'disabled');
+          if (dueDateLabel) dueDateLabel.classList.add('dimmed');
+          operatorSignatureInput.value = '';
+          operatorSignatureInput.setAttribute('disabled', 'disabled');
+          if (operatorSignatureLabel) operatorSignatureLabel.classList.add('dimmed');
+          priorityRadios.forEach(r => r.setAttribute('disabled', 'disabled'));
+          if (priorityGroup) priorityGroup.classList.add('dimmed');
+          if (attachmentLabel) attachmentLabel.classList.remove('dimmed');
+          modeHelp.textContent = 'Image-only mode prints the attachment directly.';
+        } else {
+          taskNameInput.removeAttribute('disabled');
+          taskNameInput.parentElement.classList.remove('dimmed');
+          dueDateInput.removeAttribute('disabled');
+          if (dueDateLabel) dueDateLabel.classList.remove('dimmed');
+          operatorSignatureInput.removeAttribute('disabled');
+          if (operatorSignatureLabel) operatorSignatureLabel.classList.remove('dimmed');
+          priorityRadios.forEach(r => r.removeAttribute('disabled'));
+          if (priorityGroup) priorityGroup.classList.remove('dimmed');
+          modeHelp.textContent = 'Attach an image below to print it directly.';
+        }
+      }
+
       setDefaultDate();
+      applyImageOnlyMode();
       dueDateInput.addEventListener('click', openDatePicker);
       dueDateInput.addEventListener('focus', openDatePicker);
       dueDateInput.addEventListener('change', ensureDateValue);
       dueDateInput.addEventListener('blur', ensureDateValue);
       dueDateInput.addEventListener('input', ensureDateValue);
+      imageOnlyToggle.addEventListener('change', applyImageOnlyMode);
 
       async function loadHistory() {
         try {
@@ -268,13 +321,17 @@ FORM_HTML = """
         }
 
         for (const item of items) {
+          const titleText = item.image_only ? 'Image-only print' : escapeHtml(item.name || 'Untitled task');
+          const metaText = item.image_only
+            ? 'Mode: Image-only'
+            : `Priority: ${priorityLabels[item.priority] || item.priority} · Due: ${escapeHtml(item.due_date)}`;
           const card = document.createElement('article');
           card.className = 'history-card';
           card.innerHTML = `
             <header>
               <div>
-                <div><strong>${escapeHtml(item.name)}</strong></div>
-                <div class="history-meta">Priority: ${priorityLabels[item.priority] || item.priority} · Due: ${escapeHtml(item.due_date)}</div>
+                <div><strong>${titleText}</strong></div>
+                <div class="history-meta">${metaText}</div>
               </div>
               <div class="history-actions">
                 <button class="btn-secondary" data-reprint="${item.id}">Reprint</button>
@@ -313,6 +370,11 @@ FORM_HTML = """
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        if (imageOnlyToggle.checked && !(attachmentInput.files && attachmentInput.files.length)) {
+          alert('Please attach an image to use image-only mode.');
+          return;
+        }
+
         const formData = new FormData(form);
         submitBtn.disabled = true;
         submitBtn.textContent = 'Printing...';
@@ -329,12 +391,19 @@ FORM_HTML = """
             dialogHeader.className = 'dialog-header success';
             dialogIcon.textContent = 'OK';
             dialogTitle.textContent = 'Sent to printer';
-            dialogBody.innerHTML = `
-              <p><strong>Task:</strong> ${escapeHtml(result.task.name)}</p>
-              <p><strong>Priority:</strong> ${priorityGlyphs[result.task.priority] || ''} ${priorityLabels[result.task.priority] || result.task.priority}</p>
-              <p><strong>Due:</strong> ${escapeHtml(result.task.due_date)}</p>
-              ${result.preview ? `<div class="preview"><img src="${result.preview}" alt="Printed ticket preview" /></div>` : ''}
-            `;
+            if (result.image_only) {
+              dialogBody.innerHTML = `
+                <p><strong>Mode:</strong> Image-only</p>
+                ${result.preview ? `<div class="preview"><img src="${result.preview}" alt="Printed image preview" /></div>` : ''}
+              `;
+            } else {
+              dialogBody.innerHTML = `
+                <p><strong>Task:</strong> ${escapeHtml(result.task.name)}</p>
+                <p><strong>Priority:</strong> ${priorityGlyphs[result.task.priority] || ''} ${priorityLabels[result.task.priority] || result.task.priority}</p>
+                <p><strong>Due:</strong> ${escapeHtml(result.task.due_date)}</p>
+                ${result.preview ? `<div class="preview"><img src="${result.preview}" alt="Printed ticket preview" /></div>` : ''}
+              `;
+            }
             // Clear form on success for next task, but keep due date
             const savedDueDate = dueDateInput.value;
             form.reset();
@@ -344,6 +413,7 @@ FORM_HTML = """
             // Clear attachment preview and input
             attachmentInput.value = '';
             showPreview(null);
+            applyImageOnlyMode();
             loadHistory();
           } else {
             dialogHeader.className = 'dialog-header error';
@@ -472,6 +542,26 @@ def index() -> HTMLResponse:
     return HTMLResponse(FORM_HTML)
 
 
+def normalize_image_for_printer(image_bytes: bytes, target_width: int) -> bytes:
+    """Scale and pad image bytes to the printer width to avoid cropping."""
+    with Image.open(BytesIO(image_bytes)) as im:
+        im = im.convert("L")
+        width, height = im.size
+        if width <= 0 or height <= 0:
+            raise ValueError("Invalid image dimensions.")
+        if width != target_width:
+            scale = target_width / float(width)
+            new_height = max(1, int(height * scale))
+            im = im.resize((target_width, new_height), Image.LANCZOS)
+        if im.size[0] != target_width:
+            canvas = Image.new("L", (target_width, im.size[1]), 255)
+            canvas.paste(im, (0, 0))
+            im = canvas
+        buf = BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+
+
 @app.post("/print")
 async def handle_print(
     request: Request,
@@ -479,6 +569,7 @@ async def handle_print(
     priority: Optional[str] = Form(default=None),
     due_date: Optional[str] = Form(default=None),
     operator_signature: Optional[str] = Form(default=None),
+    image_only: Optional[str] = Form(default=None),
     attachment: Optional[UploadFile] = File(default=None),
 ):
     content_type = request.headers.get("content-type", "")
@@ -488,12 +579,14 @@ async def handle_print(
         priority_raw = str(payload.get("priority") or "2").strip()
         due_date = (payload.get("due_date") or "").strip()
         operator_signature = (payload.get("operator_signature") or "").strip()
+        image_only_flag = bool(payload.get("image_only"))
         attachment_bytes = None
     else:
         name = (name or "").strip()
         priority_raw = (priority or "2").strip()
         due_date = (due_date or "").strip()
         operator_signature = (operator_signature or "").strip()
+        image_only_flag = bool(image_only)
         attachment_bytes = None
         if attachment:
             try:
@@ -501,7 +594,13 @@ async def handle_print(
             except Exception:
                 attachment_bytes = None
 
-    if not name or not due_date:
+    if image_only_flag and not attachment_bytes:
+        return JSONResponse(
+            {"success": False, "error": "Image-only mode requires an attachment."},
+            status_code=400,
+        )
+
+    if not image_only_flag and (not name or not due_date):
         return JSONResponse(
             {"success": False, "error": "Missing name or due date."},
             status_code=400,
@@ -514,25 +613,34 @@ async def handle_print(
     except Exception:
         priority = 2
 
-    # Build a simple object with the attributes expected by the HTML generator
-    task_obj = SimpleNamespace(
-        name=name,
-        priority=priority,
-        due_date=due_date,
-        operator_signature=operator_signature,
-        attachment_bytes=attachment_bytes,
-    )
-
-    # Generate an image from the HTML ticket (optionally avoiding disk)
-    image_path, image_bytes = create_task_image(task_obj, retain_file=RETAIN_TICKET_FILES)
-    if image_path is None and image_bytes is None:
-        return JSONResponse(
-            {
-                "success": False,
-                "error": "Failed to render ticket image. Ensure wkhtmltoimage or Selenium+Chrome are installed.",
-            },
-            status_code=500,
+    if image_only_flag:
+        image_path = None
+        image_bytes = attachment_bytes
+        if image_bytes:
+            try:
+                image_bytes = normalize_image_for_printer(image_bytes, PRINTER_IMAGE_WIDTH)
+            except Exception:
+                pass
+    else:
+        # Build a simple object with the attributes expected by the HTML generator
+        task_obj = SimpleNamespace(
+            name=name,
+            priority=priority,
+            due_date=due_date,
+            operator_signature=operator_signature,
+            attachment_bytes=attachment_bytes,
         )
+
+        # Generate an image from the HTML ticket (optionally avoiding disk)
+        image_path, image_bytes = create_task_image(task_obj, retain_file=RETAIN_TICKET_FILES)
+        if image_path is None and image_bytes is None:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "Failed to render ticket image. Ensure wkhtmltoimage or Selenium+Chrome are installed.",
+                },
+                status_code=500,
+            )
 
     # Convert to grayscale for thermal printer, and for preview/history storage
     preview_data = None
@@ -565,12 +673,13 @@ async def handle_print(
     try:
         _history.appendleft({
             "id": len(_history) + 1 if not _history else (_history[0]["id"] + 1),
-            "name": name,
+            "name": name or "Image-only print",
             "priority": priority,
             "due_date": due_date,
             "preview": preview_data,
             "image_bytes": image_bytes,
             "operator_signature": operator_signature,
+            "image_only": image_only_flag,
         })
     except Exception:
         pass
@@ -578,6 +687,7 @@ async def handle_print(
     # Success response
     return JSONResponse({
         "success": True,
+        "image_only": image_only_flag,
         "task": {
             "name": name,
             "priority": priority,
@@ -599,6 +709,7 @@ async def history(_: Request):
             "priority": entry["priority"],
             "due_date": entry["due_date"],
             "preview": entry.get("preview"),
+            "image_only": entry.get("image_only", False),
         })
     return JSONResponse({"items": items})
 
