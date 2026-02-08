@@ -15,6 +15,7 @@ from PIL import Image
 
 from .html_generator import create_task_image
 from . import print_to_thermal_printer
+from .printer import check_printer_reachable
 
 load_dotenv()
 RETAIN_TICKET_FILES = os.getenv("RETAIN_TICKET_FILES", "false").lower() not in {"false", "0", "no"}
@@ -43,6 +44,11 @@ FORM_HTML = """
       button { padding: 0.7rem 1rem; font-size: 1rem; background: #111; color: #fff; border: 0; border-radius: 6px; cursor: pointer; }
       button:disabled { background: #666; cursor: not-allowed; }
       .msg { padding: 0.8rem 1rem; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; }
+      .status-banner { display: flex; gap: 0.6rem; align-items: center; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; }
+      .status-dot { width: 10px; height: 10px; border-radius: 999px; background: #94a3b8; }
+      .status-ok .status-dot { background: #16a34a; }
+      .status-bad .status-dot { background: #dc2626; }
+      .status-text { font-size: 0.95rem; color: #0f172a; }
 
       /* Dialog styles */
       dialog { border: none; border-radius: 12px; padding: 0; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
@@ -130,6 +136,10 @@ FORM_HTML = """
     <div class="wrap">
       <h1>Print a Task</h1>
       <p class="msg">Enter a task and click Print! It will render a ticket and send it to your configured thermal printer.</p>
+      <div id="printer-status" class="status-banner">
+        <span class="status-dot"></span>
+        <span class="status-text">Checking printer status...</span>
+      </div>
       <form id="print-form">
         <div class="mode-toggle">
           <div class="toggle-row">
@@ -236,6 +246,8 @@ FORM_HTML = """
       const operatorSignatureInput = document.getElementById('operator_signature');
       const operatorSignatureLabel = operatorSignatureInput.closest('label');
       const attachmentLabel = attachmentInput.closest('label');
+      const printerStatus = document.getElementById('printer-status');
+      const printerStatusText = printerStatus.querySelector('.status-text');
 
       const priorityLabels = { '1': 'High', '2': 'Medium', '3': 'Low' };
       const priorityGlyphs = { '1': '⚡⚡⚡', '2': '⚡⚡', '3': '⚡' };
@@ -528,7 +540,30 @@ FORM_HTML = """
         reader.readAsDataURL(file);
       }
 
+      async function refreshPrinterStatus() {
+        try {
+          const res = await fetch('/health');
+          const data = await res.json();
+          if (data.ok) {
+            printerStatus.classList.remove('status-bad');
+            printerStatus.classList.add('status-ok');
+            printerStatusText.textContent = `Printer reachable at ${data.host}:${data.port}`;
+          } else {
+            printerStatus.classList.remove('status-ok');
+            printerStatus.classList.add('status-bad');
+            const details = data.error ? ` (${data.error})` : '';
+            printerStatusText.textContent = `Printer offline at ${data.host}:${data.port}${details}`;
+          }
+        } catch (err) {
+          printerStatus.classList.remove('status-ok');
+          printerStatus.classList.add('status-bad');
+          printerStatusText.textContent = 'Printer status unavailable';
+        }
+      }
+
       loadHistory();
+      refreshPrinterStatus();
+      setInterval(refreshPrinterStatus, 15000);
     </script>
   </body>
 </html>
@@ -712,6 +747,11 @@ async def history(_: Request):
             "image_only": entry.get("image_only", False),
         })
     return JSONResponse({"items": items})
+
+
+@app.get("/health")
+def health():
+    return JSONResponse(check_printer_reachable())
 
 
 @app.post("/reprint")

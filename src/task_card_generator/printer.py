@@ -2,6 +2,7 @@
 
 import io
 import os
+import socket
 from typing import Optional, Union
 
 from PIL import Image
@@ -19,7 +20,10 @@ def _get_printer() -> PrinterTransport:
     # printer = Serial('/dev/ttyUSB0')
 
     # Option 3: Network/WiFi Printer (default)
-    printer = Network(os.getenv("PRINTER_HOST", "192.168.2.120"))
+    printer = Network(
+        os.getenv("PRINTER_HOST", "192.168.2.120"),
+        int(os.getenv("PRINTER_PORT", "9100")),
+    )
 
     # Option 4: File Device (direct device access)
     # printer = File("/dev/usb/lp0")
@@ -53,3 +57,18 @@ def print_to_thermal_printer(image_bytes: Optional[bytes] = None) -> None:
     printer.cut(feed=cut_feed)
 
     print("Successfully printed to thermal printer!")
+
+
+def check_printer_reachable(timeout: float = 1.5) -> dict:
+    """Best-effort network reachability check for the default printer."""
+    host = os.getenv("PRINTER_HOST", "192.168.2.120")
+    try:
+        port = int(os.getenv("PRINTER_PORT", "9100"))
+    except ValueError:
+        port = 9100
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return {"ok": True, "host": host, "port": port}
+    except OSError as exc:
+        return {"ok": False, "host": host, "port": port, "error": str(exc)}

@@ -31,6 +31,7 @@ Required/optional environment variables:
 - `WEB_APP_PORT` (default `8000`)
 - `RETAIN_TICKET_FILES` (default `false`)
 - `PRINTER_HOST` (default `192.168.2.120`)
+- `PRINTER_PORT` (default `9100`)
 - `PRINTER_CUT_FEED` (default `true`)
 - `PRINTER_IMAGE_WIDTH` (default `576`, pixels; used to scale image-only prints)
 - `TICKET_PADDING_TOP` (default `0`)
@@ -64,6 +65,7 @@ GitHub Actions builds and pushes to GHCR on `main` and tags. The image name is `
 - Ticket rendering uses `imgkit` (wkhtmltoimage) with a Selenium fallback. Install one of these toolchains if rendering fails.
 - Configure your printer connection in `src/task_card_generator/printer.py` if you use USB/Serial instead of network.
 - Image-only mode prints the attachment scaled to `PRINTER_IMAGE_WIDTH` to avoid cropping.
+- The web UI polls `/health` to show printer reachability on the home page.
 
 ## License
 
