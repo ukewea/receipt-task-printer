@@ -13,6 +13,7 @@ RUN apt-get update \
         libgl1 \
         libglib2.0-0 \
         wkhtmltopdf \
+        fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
