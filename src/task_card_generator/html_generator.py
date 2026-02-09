@@ -79,20 +79,20 @@ def create_task_html(task):
     # Priority indicator - handle both Task object and dict
     if hasattr(task, 'priority'):
         # Task object with numeric priority
-        priority_map = {1: ("⚡ ⚡ ⚡", "HIGH PRIORITY"),
-                       2: ("⚡ ⚡", "MEDIUM PRIORITY"),
-                       3: ("⚡", "LOW PRIORITY")}
-        priority_dots, priority_text = priority_map.get(task.priority, ("⚡ ⚡", "MEDIUM PRIORITY"))
+        priority_map = {1: ("★ ★ ★", "HIGH PRIORITY"),
+                       2: ("★ ★", "MEDIUM PRIORITY"),
+                       3: ("★", "LOW PRIORITY")}
+        priority_dots, priority_text = priority_map.get(task.priority, ("★ ★", "MEDIUM PRIORITY"))
     else:
         # Dict format with string priority
         if task["priority"].upper() == "HIGH":
-            priority_dots = "⚡ ⚡ ⚡"
+            priority_dots = "★ ★ ★"
             priority_text = "HIGH PRIORITY"
         elif task["priority"].upper() == "MEDIUM":
-            priority_dots = "⚡ ⚡"
+            priority_dots = "★ ★"
             priority_text = "MEDIUM PRIORITY"
         else:
-            priority_dots = "⚡"
+            priority_dots = "★"
             priority_text = "LOW PRIORITY"
     
     html_content = f"""
