@@ -14,6 +14,7 @@ RUN apt-get update \
         libglib2.0-0 \
         wkhtmltopdf \
         fonts-noto-cjk \
+        fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
