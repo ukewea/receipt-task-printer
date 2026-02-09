@@ -4,6 +4,7 @@ import base64
 import html
 import logging
 import os
+import shutil
 import tempfile
 from io import BytesIO
 from urllib.parse import quote
@@ -320,7 +321,11 @@ def html_to_image_selenium(html_content, retain_file=True):
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
         chrome_options.add_argument('--window-size=576,800')  # Tall enough to capture content
-        
+        # Use Chromium when google-chrome is not available (e.g. Debian slim)
+        chromium_bin = shutil.which("chromium") or shutil.which("chromium-browser")
+        if chromium_bin:
+            chrome_options.binary_location = chromium_bin
+
         # Create webdriver
         driver = webdriver.Chrome(options=chrome_options)
         
