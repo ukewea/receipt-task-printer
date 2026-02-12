@@ -115,8 +115,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  /* Edit support: load history data into form */
+  window.loadTodolistForEdit = function(item) {
+    document.getElementById('todolist-title').value = item.name || '';
+    itemList.innerHTML = '';
+    const entries = item.items || [];
+    if (entries.length === 0) {
+      addItem('');
+    } else {
+      entries.forEach(text => addItem(text));
+    }
+    itemList.querySelector('input').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   /* Init shared components */
   initPrinterStatus();
   initDialog();
   loadHistory();
+
+  /* Check for ?edit= query param */
+  const editId = new URLSearchParams(window.location.search).get('edit');
+  if (editId) {
+    fetch('/history')
+      .then(res => res.json())
+      .then(data => {
+        const entry = (data.items || []).find(i => String(i.id) === editId);
+        if (entry) window.loadTodolistForEdit(entry);
+      })
+      .catch(() => {});
+    /* Clean up URL */
+    window.history.replaceState({}, '', '/todolist');
+  }
 });

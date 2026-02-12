@@ -240,6 +240,7 @@ async def handle_print_todolist(request: Request):
             "id": _next_history_id(),
             "type": "todolist",
             "name": title or "Todolist",
+            "items": items,
             "item_count": len(items),
             "preview": preview_data,
             "image_bytes": image_bytes,
@@ -267,6 +268,7 @@ async def history(_: Request):
         }
         if item["type"] == "todolist":
             item["item_count"] = entry.get("item_count", 0)
+            item["items"] = entry.get("items", [])
         else:
             item["priority"] = entry.get("priority", 2)
             item["due_date"] = entry.get("due_date", "")

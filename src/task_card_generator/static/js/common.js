@@ -95,6 +95,9 @@ function renderHistory(items) {
       titleText = escapeHtml(item.name || 'Untitled task');
       metaText = `Priority: ${priorityLabels[item.priority] || item.priority} \u00b7 Due: ${escapeHtml(item.due_date)}`;
     }
+    const editBtn = item.type === 'todolist'
+      ? `<button class="btn-secondary" data-edit-todolist="${item.id}">Edit</button>`
+      : '';
     const card = document.createElement('article');
     card.className = 'history-card';
     card.innerHTML = `
@@ -104,6 +107,7 @@ function renderHistory(items) {
           <div class="history-meta">${metaText}</div>
         </div>
         <div class="history-actions">
+          ${editBtn}
           <button class="btn-secondary" data-reprint="${item.id}">Reprint</button>
         </div>
       </header>
@@ -111,6 +115,19 @@ function renderHistory(items) {
     `;
     historyList.appendChild(card);
   }
+
+  historyList.querySelectorAll('[data-edit-todolist]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-edit-todolist');
+      const item = items.find(i => String(i.id) === id);
+      if (!item) return;
+      if (window.location.pathname === '/todolist' && typeof window.loadTodolistForEdit === 'function') {
+        window.loadTodolistForEdit(item);
+      } else {
+        window.location.href = `/todolist?edit=${id}`;
+      }
+    });
+  });
 
   historyList.querySelectorAll('[data-reprint]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
