@@ -1,0 +1,59 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Receipt Printer – Todolist</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+  </head>
+  <body>
+    <div class="wrap">
+      <nav class="nav">
+        <a href="/" class="nav-link">Task Card</a>
+        <a href="/todolist" class="nav-link active">Todolist</a>
+      </nav>
+      <h1>Print a Todolist</h1>
+      <p class="msg">Add items and print a checklist to your thermal printer.</p>
+      <div id="printer-status" class="status-banner">
+        <span class="status-dot"></span>
+        <span class="status-text">Checking printer status...</span>
+      </div>
+      <form id="todolist-form">
+        <label>
+          Title (optional)
+          <input type="text" name="title" id="todolist-title" placeholder="e.g., Grocery List" />
+        </label>
+        <div>
+          <div style="font-weight:600; margin-bottom:0.35rem;">Items</div>
+          <div class="item-list" id="item-list"></div>
+          <button type="button" class="add-item-btn" id="add-item-btn">+ Add item</button>
+        </div>
+        <div>
+          <button type="submit" id="submit-btn">Print Todolist!</button>
+        </div>
+      </form>
+    </div>
+
+    <dialog id="result-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header" id="dialog-header">
+          <span class="dialog-icon" id="dialog-icon"></span>
+          <h2 class="dialog-title" id="dialog-title"></h2>
+        </div>
+        <div class="dialog-body" id="dialog-body"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="dialog-close" id="dialog-close">OK</button>
+      </div>
+    </dialog>
+
+    <section class="history" aria-label="Recent prints">
+      <h2>Recent prints</h2>
+      <p class="history-note">Last 10 tickets stay in memory for quick reprint.</p>
+      <div class="history-list" id="history-list"></div>
+    </section>
+
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/todolist.js"></script>
+  </body>
+</html>

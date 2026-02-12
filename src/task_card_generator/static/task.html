@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Receipt Printer – Print Task</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+  </head>
+  <body>
+    <div class="wrap">
+      <nav class="nav">
+        <a href="/" class="nav-link active">Task Card</a>
+        <a href="/todolist" class="nav-link">Todolist</a>
+      </nav>
+      <h1>Print a Task</h1>
+      <p class="msg">Enter a task and click Print! It will render a ticket and send it to your configured thermal printer.</p>
+      <div id="printer-status" class="status-banner">
+        <span class="status-dot"></span>
+        <span class="status-text">Checking printer status...</span>
+      </div>
+      <form id="print-form">
+        <div class="mode-toggle">
+          <div class="toggle-row">
+            <input type="checkbox" id="image_only" name="image_only" />
+            <label for="image_only">Image-only print (skip the ticket layout)</label>
+          </div>
+          <div class="toggle-help" id="mode-help">Attach an image below to print it directly.</div>
+        </div>
+        <label>
+          Task name
+          <input type="text" name="name" id="name" required placeholder="e.g., Pick up dry cleaning" />
+        </label>
+        <div class="priority-group">
+          <div>Priority</div>
+          <div class="priority-options" role="radiogroup" aria-label="Priority">
+            <label class="priority-pill">
+              <input type="radio" name="priority" value="1" aria-label="High" />
+              <span class="glyph">&#x26A1;&#x26A1;&#x26A1;</span>
+              <span class="text">High</span>
+            </label>
+            <label class="priority-pill">
+              <input type="radio" name="priority" value="2" aria-label="Medium" checked />
+              <span class="glyph">&#x26A1;&#x26A1;</span>
+              <span class="text">Medium</span>
+            </label>
+            <label class="priority-pill">
+              <input type="radio" name="priority" value="3" aria-label="Low" />
+              <span class="glyph">&#x26A1;</span>
+              <span class="text">Low</span>
+            </label>
+          </div>
+        </div>
+        <div class="row-split">
+          <label>
+            Due date
+            <input type="date" name="due_date" id="due_date" required inputmode="none" />
+          </label>
+          <label>
+            Op. signature
+            <input type="text" name="operator_signature" id="operator_signature" placeholder="e.g., Alice" />
+          </label>
+        </div>
+        <div class="attachment-block">
+          <label>
+            Attachment image (optional)
+            <input type="file" name="attachment" id="attachment" accept="image/*" style="display:none" />
+            <div id="dropzone" class="dropzone">
+              <div class="overlay-text">
+                Drag an image here, click to browse, or paste from clipboard
+                <small>Shown at the bottom of the ticket</small>
+              </div>
+              <div id="attachment-preview" class="preview-box">
+                <img id="attachment-preview-img" alt="Attachment preview" />
+              </div>
+            </div>
+          </label>
+        </div>
+        <div>
+          <button type="submit" id="submit-btn">Print!</button>
+        </div>
+      </form>
+    </div>
+
+    <dialog id="result-dialog">
+      <div class="dialog-content">
+        <div class="dialog-header" id="dialog-header">
+          <span class="dialog-icon" id="dialog-icon"></span>
+          <h2 class="dialog-title" id="dialog-title"></h2>
+        </div>
+        <div class="dialog-body" id="dialog-body"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="dialog-close" id="dialog-close">OK</button>
+      </div>
+    </dialog>
+
+    <section class="history" aria-label="Recent prints">
+      <h2>Recent prints</h2>
+      <p class="history-note">Last 10 tickets stay in memory for quick reprint.</p>
+      <div class="history-list" id="history-list"></div>
+    </section>
+
+    <script src="/static/js/common.js"></script>
+    <script src="/static/js/task.js"></script>
+  </body>
+</html>

@@ -386,3 +386,97 @@ def create_task_html_image(task_data):
     """Create task card image and return the file path (retained on disk)."""
     image_path, _ = create_task_image(task_data, retain_file=True)
     return image_path
+
+
+def create_todolist_html(title, items):
+    """Create HTML content for a todolist receipt with checkboxes."""
+    title_safe = html.escape(title) if title else ""
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d %H:%M")
+
+    items_html = ""
+    for i, item in enumerate(items):
+        item_safe = html.escape(item)
+        border_style = 'border-bottom: 2px dotted #999;' if i < len(items) - 1 else ''
+        items_html += f"""
+        <div style="display: flex; align-items: flex-start; padding: 8px 4px; {border_style}">
+            <div style="width: 28px; height: 28px; min-width: 28px; border: 3px solid #000; border-radius: 3px; margin-top: 1px; margin-right: 16px;"></div>
+            <div style="font-size: 22px; color: #000; line-height: 1.4; word-wrap: break-word; overflow-wrap: break-word;">{item_safe}</div>
+        </div>
+        """
+
+    title_block = ""
+    if title_safe:
+        title_block = f"""
+        <div style="text-align: center; margin-bottom: 4px;">
+            <div style="font-size: 28px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; color: #000;">{title_safe}</div>
+        </div>
+        <div class="perforation" style="margin-bottom: 6px;"></div>
+        """
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                font-family: 'Noto Sans CJK TC', 'Noto Sans CJK SC', 'Noto Color Emoji', 'Microsoft JhengHei UI', 'Segoe UI', Arial, sans-serif;
+                background-color: white;
+                width: 576px;
+                padding: 0;
+                margin: 0;
+            }}
+            .ticket-container {{
+                background: white;
+                padding: {TICKET_PADDING_TOP}px {TICKET_PADDING_RIGHT}px 0 0;
+                position: relative;
+            }}
+            .perforation {{
+                background: repeating-linear-gradient(
+                    to right,
+                    #000 0,
+                    #000 6px,
+                    transparent 6px,
+                    transparent 12px
+                );
+                height: 3px;
+                margin: 3px 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="ticket-container">
+            {title_block}
+            <div style="padding: 0 4px;">
+                {items_html}
+            </div>
+            <div style="text-align: center; padding: 8px 0 4px; color: #666; font-size: 16px;">
+                {len(items)} items &middot; {date_str}
+            </div>
+            <div class="perforation" style="margin-top: 4px;"></div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+
+def create_todolist_image(title, items, retain_file=True):
+    """Create todolist image from HTML, optionally avoiding filesystem writes."""
+    html_content = create_todolist_html(title, items)
+
+    logger.info("Starting todolist image render; retain_file=%s", retain_file)
+    image_path, image_bytes = html_to_image_imgkit(html_content, retain_file=retain_file)
+
+    if image_bytes is None:
+        logger.info("Falling back to Selenium for todolist render")
+        image_path, image_bytes = html_to_image_selenium(html_content, retain_file=retain_file)
+    else:
+        logger.info("imgkit render succeeded; skipping Selenium fallback")
+
+    if image_bytes is None:
+        logger.warning("Todolist render failed in both imgkit and Selenium")
+
+    return image_path, image_bytes
