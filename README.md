@@ -67,6 +67,16 @@ GitHub Actions builds and pushes to GHCR on `main` and tags. The image name is `
 - Image-only mode prints the attachment scaled to `PRINTER_IMAGE_WIDTH` to avoid cropping.
 - The web UI polls `/health` to show printer reachability on the home page.
 
+## Issue Tracking
+
+Issues are tracked in-repo under `issues/` (filesystem-based).
+
+- Start with `issues/README.md`
+- Use `issues/templates/ISSUE_TEMPLATE.md`
+- Optional helper: `scripts/new-issue.sh --title "..."`
+- Keep `issues/index.md` updated when adding/changing issue status
+- Move issue files across status folders: `open`, `in_progress`, `resolved`, `rejected`
+
 ## License
 
 MIT License - see LICENSE file for details.

@@ -388,6 +388,233 @@ def create_task_html_image(task_data):
     return image_path
 
 
+def create_quote_html(quote: str, author: str = "", tagline: str = "", date_str: str = "", zh_tw: str = ""):
+    """Create HTML content for a dedicated quote receipt.
+
+    Designed to look like a tiny typographic poster on 576px thermal paper.
+
+    - English quote is always rendered large.
+    - zh-TW translation (optional) is rendered smaller below, if provided.
+    """
+    quote_safe = html.escape((quote or "").strip())
+    zh_safe = html.escape((zh_tw or "").strip())
+    author_safe = html.escape((author or "").strip())
+    tagline_safe = html.escape((tagline or "").strip())
+
+    # Date string shown in header (defaults to local time)
+    if not (date_str or "").strip():
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    date_safe = html.escape(date_str)
+
+    # Simple auto-sizing based on character count (works well for most quotes)
+    n = len((quote or "").strip())
+    if n <= 60:
+        quote_font = 60
+        line_height = 1.12
+    elif n <= 110:
+        quote_font = 52
+        line_height = 1.16
+    elif n <= 170:
+        quote_font = 44
+        line_height = 1.20
+    else:
+        quote_font = 38
+        line_height = 1.22
+
+    # zh-TW sizing (separate; generally smaller)
+    zn = len((zh_tw or "").strip())
+    if zn <= 0:
+        zh_font = 0
+        zh_line_height = 1.35
+    elif zn <= 40:
+        zh_font = 28
+        zh_line_height = 1.35
+    elif zn <= 80:
+        zh_font = 26
+        zh_line_height = 1.38
+    else:
+        zh_font = 24
+        zh_line_height = 1.40
+
+    footer_block = ""
+    if tagline_safe:
+        footer_block = f"<div class=\"tagline\">{tagline_safe}</div>"
+
+    zh_block = ""
+    if zh_safe and zh_font > 0:
+        zh_block = f"<div class=\"zh\">{zh_safe}</div>"
+
+    author_block = ""
+    if author_safe:
+        author_block = f"<div class=\"author\">— {author_safe}</div>"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset=\"UTF-8\">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            body {{
+                font-family: 'Noto Sans CJK TC', 'Noto Sans CJK SC', 'Microsoft JhengHei UI', 'Segoe UI', Arial, sans-serif;
+                background-color: white;
+                width: 576px;
+                padding: 0;
+                margin: 0;
+                color: #000;
+            }}
+            .ticket-container {{
+                background: white;
+                padding: {TICKET_PADDING_TOP}px {TICKET_PADDING_RIGHT}px 0 0;
+                position: relative;
+            }}
+            .perforation {{
+                background: repeating-linear-gradient(
+                    to right,
+                    #000 0,
+                    #000 6px,
+                    transparent 6px,
+                    transparent 12px
+                );
+                height: 3px;
+                margin: 8px 0;
+            }}
+            .top {{
+                text-align: center;
+                padding: 10px 6px 2px;
+            }}
+            .label {{
+                font-size: 22px;
+                font-weight: 800;
+                letter-spacing: 4px;
+                text-transform: uppercase;
+            }}
+            .date {{
+                margin-top: 6px;
+                font-size: 18px;
+                font-weight: 600;
+                letter-spacing: 1px;
+                color: #111;
+            }}
+            .quote-wrap {{
+                position: relative;
+                padding: 10px 16px 6px;
+            }}
+            .open-quote {{
+                position: absolute;
+                left: -8px;
+                top: 2px;
+                font-size: 64px;
+                line-height: 1;
+                font-weight: 900;
+                margin: 0;
+            }}
+            .close-quote {{
+                position: absolute;
+                right: 0px;
+                bottom: 0px;
+                font-size: 64px;
+                line-height: 1;
+                font-weight: 900;
+                margin: 0;
+            }}
+            .quote {{
+                padding-left: 50px;
+                padding-right: 38px;
+                font-size: {quote_font}px;
+                line-height: {line_height};
+                font-weight: 800;
+                letter-spacing: -0.5px;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+                hyphens: auto;
+            }}
+            .zh {{
+                margin-top: 12px;
+                padding-left: 50px;
+                padding-right: 38px;
+                font-size: {zh_font}px;
+                line-height: {zh_line_height};
+                font-weight: 650;
+                letter-spacing: 0.2px;
+                color: #111;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }}
+            .author {{
+                margin-top: 12px;
+                text-align: right;
+                font-size: 24px;
+                font-weight: 700;
+                letter-spacing: 0.3px;
+            }}
+            .footer {{
+                text-align: center;
+                padding: 8px 12px 6px;
+                color: #444;
+                font-size: 16px;
+                font-weight: 600;
+            }}
+            .tagline {{
+                margin-top: 6px;
+                font-size: 18px;
+                font-weight: 800;
+                letter-spacing: 0.5px;
+                color: #000;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class=\"ticket-container\">
+            <div class=\"top\">
+                <div class=\"label\">DAILY QUOTE</div>
+                <div class=\"date\">{date_safe}</div>
+            </div>
+
+            <div class=\"perforation\"></div>
+
+            <div class=\"quote-wrap\">
+                <span class=\"open-quote\">“</span>
+                <span class=\"close-quote\">”</span>
+                <div class=\"quote\">{quote_safe}</div>
+                {zh_block}
+                {author_block}
+            </div>
+
+            <div class=\"perforation\"></div>
+
+            <div class=\"footer\">
+                <div>Take the win.</div>
+                {footer_block}
+            </div>
+
+            <div class=\"perforation\"></div>
+        </div>
+    </body>
+    </html>
+    """
+    return html_content
+
+
+def create_quote_image(quote: str, author: str = "", tagline: str = "", date_str: str = "", zh_tw: str = "", retain_file: bool = True):
+    """Create quote receipt image from HTML."""
+    html_content = create_quote_html(quote=quote, author=author, tagline=tagline, date_str=date_str, zh_tw=zh_tw)
+
+    logger.info("Starting quote image render; retain_file=%s", retain_file)
+    image_path, image_bytes = html_to_image_imgkit(html_content, retain_file=retain_file)
+
+    if image_bytes is None:
+        logger.info("Falling back to Selenium for quote render")
+        image_path, image_bytes = html_to_image_selenium(html_content, retain_file=retain_file)
+    else:
+        logger.info("imgkit render succeeded; skipping Selenium fallback")
+
+    if image_bytes is None:
+        logger.warning("Quote render failed in both imgkit and Selenium")
+
+    return image_path, image_bytes
+
+
 def create_todolist_html(title, items):
     """Create HTML content for a todolist receipt with checkboxes."""
     title_safe = html.escape(title) if title else ""

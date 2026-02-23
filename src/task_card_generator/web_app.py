@@ -7,6 +7,10 @@ from collections import deque
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
+import json
+import random
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Request, UploadFile, File, Form
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
@@ -15,7 +19,7 @@ from dotenv import load_dotenv
 from io import BytesIO
 from PIL import Image
 
-from .html_generator import create_task_image, create_todolist_image
+from .html_generator import create_task_image, create_todolist_image, create_quote_image
 from . import print_to_thermal_printer
 from .printer import check_printer_reachable
 
@@ -41,6 +45,11 @@ def index():
 @app.get("/todolist", response_class=HTMLResponse)
 def todolist_page():
     return FileResponse(STATIC_DIR / "todolist.html", media_type="text/html")
+
+
+@app.get("/quote", response_class=HTMLResponse)
+def quote_page():
+    return FileResponse(STATIC_DIR / "quote.html", media_type="text/html")
 
 
 def normalize_image_for_printer(image_bytes: bytes, target_width: int) -> bytes:
@@ -203,6 +212,62 @@ async def handle_print(
     })
 
 
+@app.post("/print-quote")
+async def handle_print_quote(request: Request):
+    payload = await request.json()
+    quote = (payload.get("quote") or "").strip()
+    author = (payload.get("author") or "").strip()
+    tagline = (payload.get("tagline") or "").strip()
+    date_str = (payload.get("date") or "").strip()
+
+    if not quote:
+        return JSONResponse({"success": False, "error": "Quote is required."}, status_code=400)
+
+    _, image_bytes = create_quote_image(
+        quote=quote,
+        zh_tw=(payload.get("zh_tw") or payload.get("zh") or "").strip(),
+        author=author,
+        tagline=tagline,
+        date_str=date_str,
+        retain_file=RETAIN_TICKET_FILES,
+    )
+    if image_bytes is None:
+        return JSONResponse(
+            {
+                "success": False,
+                "error": "Failed to render quote image. Ensure wkhtmltoimage or Selenium+Chrome are installed.",
+            },
+            status_code=500,
+        )
+
+    image_bytes, preview_data = _to_grayscale_preview(image_bytes)
+
+    try:
+        print_to_thermal_printer(image_bytes=image_bytes)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Failed to print: {str(e)}"}, status_code=500)
+
+    try:
+        _history.appendleft({
+            "id": _next_history_id(),
+            "type": "quote",
+            "name": (author and f"Quote — {author}") or "Quote",
+            "quote": quote,
+            "author": author,
+            "tagline": tagline,
+            "preview": preview_data,
+            "image_bytes": image_bytes,
+        })
+    except Exception:
+        pass
+
+    return JSONResponse({
+        "success": True,
+        "preview": preview_data,
+        "quote": {"quote": quote, "author": author, "tagline": tagline, "date": date_str},
+    })
+
+
 @app.post("/print-todolist")
 async def handle_print_todolist(request: Request):
     payload = await request.json()
@@ -269,6 +334,10 @@ async def history(_: Request):
         if item["type"] == "todolist":
             item["item_count"] = entry.get("item_count", 0)
             item["items"] = entry.get("items", [])
+        elif item["type"] == "quote":
+            item["author"] = entry.get("author", "")
+            item["quote"] = entry.get("quote", "")
+            item["tagline"] = entry.get("tagline", "")
         else:
             item["priority"] = entry.get("priority", 2)
             item["due_date"] = entry.get("due_date", "")
@@ -280,6 +349,165 @@ async def history(_: Request):
 @app.get("/health")
 def health():
     return JSONResponse(check_printer_reachable())
+
+
+def _quotes_path() -> Path:
+    return Path(__file__).parent / "quotes.json"
+
+
+def _load_quotes_list() -> list[dict]:
+    quotes_path = _quotes_path()
+    if quotes_path.exists():
+        try:
+            data = json.loads(quotes_path.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                return data
+        except Exception:
+            return []
+    return []
+
+
+def _daily_quote_dir() -> Path:
+    # Default to a repo-local data directory. Can override with env.
+    base = os.getenv("DAILY_QUOTES_DIR")
+    if base:
+        return Path(base)
+    return Path.cwd() / "data" / "daily-quotes"
+
+
+def _today_key(tz: str) -> str:
+    try:
+        zone = ZoneInfo(tz)
+    except Exception:
+        zone = ZoneInfo("Asia/Taipei")
+    return datetime.now(zone).strftime("%Y-%m-%d")
+
+
+def _daily_quote_path(day: str) -> Path:
+    d = _daily_quote_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    return d / f"{day}.json"
+
+
+@app.get("/quotes/random")
+def random_quote():
+    """Return a random upbeat quote for the Quote UI.
+
+    Reads from src/task_card_generator/quotes.json if present.
+    """
+    quotes = _load_quotes_list()
+
+    if not quotes:
+        quotes = [
+            {"quote": "Make today ridiculously effective.", "author": ""},
+            {"quote": "Start small. Start now.", "author": ""},
+            {"quote": "Do one thing that makes everything else easier.", "author": ""},
+            {"quote": "Momentum beats motivation.", "author": ""},
+            {"quote": "Tiny steps count.", "author": ""},
+        ]
+
+    pick = random.choice(quotes)
+    quote = (pick.get("quote") or "").strip()
+    author = (pick.get("author") or "").strip()
+    tagline = (pick.get("tagline") or "").strip()
+    return JSONResponse({"quote": quote, "author": author, "tagline": tagline})
+
+
+@app.get("/quotes/daily")
+def get_daily_quote(tz: str = "Asia/Taipei"):
+    """Return today's cached daily quote if it exists.
+
+    NOTE: This endpoint does not generate quotes. Generation is done by the caller,
+    then stored via /print-quote-daily.
+    """
+    day = _today_key(tz)
+    p = _daily_quote_path(day)
+    if not p.exists():
+        return JSONResponse({"ok": False, "day": day, "tz": tz, "error": "not_set"}, status_code=404)
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return JSONResponse({"ok": False, "day": day, "tz": tz, "error": f"read_failed: {exc}"}, status_code=500)
+
+    # Normalize output
+    en = (data.get("en") or data.get("quote") or "").strip()
+    zh_tw = (data.get("zh_tw") or data.get("zh") or "").strip()
+    author = (data.get("author") or "").strip()
+    tagline = (data.get("tagline") or "").strip()
+    return JSONResponse({"ok": True, "day": day, "tz": tz, "en": en, "zh_tw": zh_tw, "author": author, "tagline": tagline})
+
+
+@app.post("/print-quote-daily")
+async def print_quote_daily(request: Request):
+    """Print today's quote with a server-side daily cache.
+
+    Behavior:
+    - First call of the day stores the provided quote payload to disk and prints it.
+    - Subsequent calls ignore the incoming payload and re-print the cached quote.
+
+    Caller must generate the English quote and (optionally) zh-TW translation.
+    """
+    payload = await request.json()
+
+    tz = (payload.get("tz") or "Asia/Taipei").strip() or "Asia/Taipei"
+    day = _today_key(tz)
+    p = _daily_quote_path(day)
+
+    if p.exists():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as exc:
+            return JSONResponse({"success": False, "error": f"Failed to read daily cache: {exc}"}, status_code=500)
+        source = "cache"
+    else:
+        en = (payload.get("en") or payload.get("quote") or "").strip()
+        if not en:
+            return JSONResponse({"success": False, "error": "Missing required field: en"}, status_code=400)
+
+        data = {
+            "day": day,
+            "tz": tz,
+            "en": en,
+            "zh_tw": (payload.get("zh_tw") or payload.get("zh") or "").strip(),
+            "author": (payload.get("author") or "").strip(),
+            "tagline": (payload.get("tagline") or "").strip(),
+            "createdAt": datetime.utcnow().isoformat() + "Z",
+        }
+        try:
+            p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        except Exception as exc:
+            return JSONResponse({"success": False, "error": f"Failed to write daily cache: {exc}"}, status_code=500)
+        source = "new"
+
+    # Print using existing quote layout (English always; Chinese currently not rendered in the template).
+    # We still store zh_tw for future bilingual template support.
+    _, image_bytes = create_quote_image(
+        quote=data.get("en") or "",
+        zh_tw=data.get("zh_tw") or "",
+        author=data.get("author") or "",
+        tagline=data.get("tagline") or "",
+        date_str=day,
+        retain_file=RETAIN_TICKET_FILES,
+    )
+    if image_bytes is None:
+        return JSONResponse({"success": False, "error": "Failed to render quote image."}, status_code=500)
+
+    image_bytes, preview_data = _to_grayscale_preview(image_bytes)
+
+    try:
+        print_to_thermal_printer(image_bytes=image_bytes)
+    except Exception as e:
+        return JSONResponse({"success": False, "error": f"Failed to print: {str(e)}"}, status_code=500)
+
+    return JSONResponse({
+        "success": True,
+        "source": source,
+        "day": day,
+        "tz": tz,
+        "en": (data.get("en") or "").strip(),
+        "zh_tw": (data.get("zh_tw") or "").strip(),
+        "preview": preview_data,
+    })
 
 
 @app.post("/reprint")

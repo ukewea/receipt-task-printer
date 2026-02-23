@@ -3,34 +3,44 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Receipt Printer – Todolist</title>
+    <title>Receipt Printer – Quote</title>
     <link rel="stylesheet" href="/static/css/common.css">
   </head>
   <body>
     <div class="wrap">
       <nav class="nav">
         <a href="/" class="nav-link">Task Card</a>
-        <a href="/todolist" class="nav-link active">Todolist</a>
-        <a href="/quote" class="nav-link">Quote</a>
+        <a href="/todolist" class="nav-link">Todolist</a>
+        <a href="/quote" class="nav-link active">Quote</a>
       </nav>
-      <h1>Print a Todolist</h1>
-      <p class="msg">Add items and print a checklist to your thermal printer.</p>
+
+      <h1>Print a Quote</h1>
+      <p class="msg">Paste an upbeat quote (or fetch a random one) and print it with the poster-style layout.</p>
+
       <div id="printer-status" class="status-banner">
         <span class="status-dot"></span>
         <span class="status-text">Checking printer status...</span>
       </div>
-      <form id="todolist-form">
+
+      <form id="quote-form">
         <label>
-          Title (optional)
-          <input type="text" name="title" id="todolist-title" placeholder="e.g., Grocery List" />
+          Quote
+          <input type="text" name="quote" id="quote" required placeholder="e.g., Start small. Start now." />
         </label>
-        <div>
-          <div style="font-weight:600; margin-bottom:0.35rem;">Items</div>
-          <div class="item-list" id="item-list"></div>
-          <button type="button" class="add-item-btn" id="add-item-btn">+ Add item</button>
+        <div class="row-split">
+          <label>
+            Author (optional)
+            <input type="text" name="author" id="author" placeholder="e.g., James Clear" />
+          </label>
+          <label>
+            Tagline (optional)
+            <input type="text" name="tagline" id="tagline" placeholder="e.g., Tiny steps count." />
+          </label>
         </div>
-        <div>
-          <button type="submit" id="submit-btn">Print Todolist!</button>
+
+        <div style="display:flex; gap:0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn-secondary" id="random-btn">Random quote</button>
+          <button type="submit" id="submit-btn">Print Quote!</button>
         </div>
       </form>
     </div>
@@ -55,6 +65,6 @@
     </section>
 
     <script src="/static/js/common.js"></script>
-    <script src="/static/js/todolist.js"></script>
+    <script src="/static/js/quote.js"></script>
   </body>
 </html>

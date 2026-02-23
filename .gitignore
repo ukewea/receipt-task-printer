@@ -65,6 +65,9 @@ output/
 *.jpeg
 .claude/
 
+# Runtime data (daily quote cache, etc.)
+data/
+
 # Node.js (if GUI is included)
 node_modules/
 

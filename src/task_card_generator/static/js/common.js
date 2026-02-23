@@ -88,6 +88,9 @@ function renderHistory(items) {
     if (item.type === 'todolist') {
       titleText = item.name ? escapeHtml(item.name) : 'Todolist';
       metaText = `${item.item_count || 0} items`;
+    } else if (item.type === 'quote') {
+      titleText = item.author ? `Quote — ${escapeHtml(item.author)}` : 'Quote';
+      metaText = item.quote ? escapeHtml(item.quote).slice(0, 120) + (item.quote.length > 120 ? '…' : '') : 'Daily quote';
     } else if (item.image_only) {
       titleText = 'Image-only print';
       metaText = 'Mode: Image-only';
