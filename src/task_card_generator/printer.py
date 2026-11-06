@@ -45,18 +45,15 @@ def print_to_thermal_printer(image_bytes: Optional[bytes] = None) -> None:
 
     try:
         cut_feed = os.getenv("PRINTER_CUT_FEED", "true").lower() not in {"false", "0", "no"}
-    except ValueError:
-        cut_feed = False
+        with Image.open(io.BytesIO(image_bytes)) as img_source:
+            printer.image(img_source, impl="bitImageColumn", center=True)
+        printer.cut(feed=cut_feed)
+        print("Successfully printed to thermal printer!")
+    finally:
+        # python-escpos has a printer <-> MagicEncode reference cycle. Relying
+        # on __del__ leaves the socket open until cyclic garbage collection.
+        printer.close()
 
-    img_source = Image.open(io.BytesIO(image_bytes))
-
-    # Print the image (bitImageColumn works well for most printers)
-    printer.image(img_source, impl="bitImageColumn", center=True)
-
-    # Cut the paper
-    printer.cut(feed=cut_feed)
-
-    print("Successfully printed to thermal printer!")
 
 
 def check_printer_reachable(timeout: float = 1.5) -> dict:
