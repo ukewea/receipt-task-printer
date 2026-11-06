@@ -40,6 +40,14 @@ jobs:
             type=ref,event=branch
             type=ref,event=tag
 
+      - name: Test renderer and API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          push: false
+          platforms: linux/amd64
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:

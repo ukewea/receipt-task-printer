@@ -12,9 +12,9 @@ Minimal FastAPI web UI for printing task tickets on a thermal receipt printer.
 ## Architecture
 
 - `src/task_card_generator/web_app.py` — FastAPI app, all endpoints (`/print`, `/health`, `/history`, `/reprint`)
-- `src/task_card_generator/html_generator.py` — HTML-to-image rendering (wkhtmltoimage primary, Selenium fallback)
+- `src/task_card_generator/html_generator.py` — HTML ticket templates; `image_renderer.py` produces bounded Fullbleed PNGs
 - `src/task_card_generator/printer.py` — ESC-POS thermal printer communication over TCP
-- `Dockerfile` — pinned to `python:3.12-slim-bookworm` (wkhtmltopdf unavailable in Trixie)
+- `Dockerfile` — Python 3.12 image with a separate font preparation stage
 - `.github/workflows/container.yml` — multi-arch (amd64/arm64) container image build
 
 ## API
@@ -30,8 +30,8 @@ POST `/print` accepts both `multipart/form-data` and `application/json`:
 ## Conventions
 
 - Priority icons: `★` unicode stars (not emoji) for clean thermal output
-- Fonts in container: `fonts-noto-cjk` (CJK support), `fonts-noto-color-emoji`
+- Fonts in container: extracted Noto Sans CJK TC Regular/Bold and DejaVu Sans; see README for local font setup
 - Font-family order: Noto Sans CJK TC/SC, Noto Color Emoji, fallbacks
-- Chromium binary auto-detection via `shutil.which()` for Selenium fallback
+- Run `docker build --target test .` to check APIs and real PNG rendering without contacting the printer
 - Config via environment variables (see `.env.example`)
 - Printer default: network ESC-POS at 192.168.2.120:9100

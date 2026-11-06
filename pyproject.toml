@@ -3,7 +3,7 @@ name = "receipt-printer-web"
 version = "0.1.0"
 description = "Minimal FastAPI-style web UI for printing tasks to a thermal receipt printer"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "CodingWithLewis" }]
 dependencies = [
@@ -13,8 +13,7 @@ dependencies = [
     "python-multipart",
     "pillow",
     "python-escpos",
-    "imgkit",
-    "selenium",
+    "fullbleed==2.5.51",
 ]
 
 [project.scripts]

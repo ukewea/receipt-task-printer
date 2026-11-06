@@ -2,39 +2,19 @@
 
 import base64
 import html
-import logging
 import os
-import shutil
-import tempfile
 from io import BytesIO
-from urllib.parse import quote
 from datetime import datetime
 
 from dotenv import load_dotenv
 
-load_dotenv()
+from .image_renderer import html_to_image
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
 # Configurable padding for ticket container (adjust per printer/machine)
 TICKET_PADDING_TOP = int(os.getenv("TICKET_PADDING_TOP", "0"))
 TICKET_PADDING_RIGHT = int(os.getenv("TICKET_PADDING_RIGHT", "8"))
-
-try:
-    import imgkit
-    IMGKIT_AVAILABLE = True
-except ImportError:
-    IMGKIT_AVAILABLE = False
-
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.common.by import By
-    import time
-    SELENIUM_AVAILABLE = True
-except ImportError:
-    SELENIUM_AVAILABLE = False
-
 
 def create_task_html(task):
     """Create HTML content for task card with ticket-style design."""
@@ -258,128 +238,11 @@ def create_task_html(task):
     return html_content
 
 
-def html_to_image_imgkit(html_content, retain_file=True):
-    """Convert HTML to image using imgkit (requires wkhtmltopdf)."""
-    if not IMGKIT_AVAILABLE:
-        logger.info("imgkit unavailable; skipping wkhtmltoimage conversion")
-        return None, None
-    logger.info("Rendering task card via imgkit/wkhtmltoimage")
-    
-    try:
-        # Configure options for thermal printer size
-        options = {
-            'width': 576,  # 72mm thermal printer width
-            'disable-smart-width': '',
-            'encoding': 'UTF-8',
-            'disable-local-file-access': '',
-            'crop-w': 576,  # Crop to exact width
-        }
-
-        # Try to configure wkhtmltopdf path for Windows
-        config = None
-        import os
-        possible_paths = [
-            r'C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe',
-            r'C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltoimage.exe',
-            r'C:\wkhtmltopdf\bin\wkhtmltoimage.exe'
-        ]
-
-        for path in possible_paths:
-            if os.path.exists(path):
-                config = imgkit.config(wkhtmltoimage=path)
-                break
-
-        # Convert HTML to image, returning either a file or bytes
-        if retain_file:
-            temp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            temp_img.close()
-            imgkit.from_string(html_content, temp_img.name, options=options, config=config)
-            with open(temp_img.name, "rb") as f:
-                img_bytes = f.read()
-            logger.info("Task card rendered via imgkit: %s", temp_img.name)
-            return temp_img.name, img_bytes
-
-        img_bytes = imgkit.from_string(html_content, False, options=options, config=config)
-        return None, img_bytes
-
-    except Exception as e:
-        logger.exception("imgkit conversion failed")
-        return None, None
-
-
-def html_to_image_selenium(html_content, retain_file=True):
-    """Convert HTML to image using Selenium (requires Chrome/ChromeDriver)."""
-    if not SELENIUM_AVAILABLE:
-        logger.info("Selenium unavailable; skipping webdriver conversion")
-        return None, None
-    logger.info("Rendering task card via Selenium screenshot")
-    
-    try:
-        # Configure Chrome options
-        chrome_options = Options()
-        chrome_options.add_argument('--headless')
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--window-size=576,800')  # Tall enough to capture content
-        # Use Chromium when google-chrome is not available (e.g. Debian slim)
-        chromium_bin = shutil.which("chromium") or shutil.which("chromium-browser")
-        if chromium_bin:
-            chrome_options.binary_location = chromium_bin
-
-        # Create webdriver
-        driver = webdriver.Chrome(options=chrome_options)
-        
-        if retain_file:
-            # Create temporary HTML file
-            temp_html = tempfile.NamedTemporaryFile(delete=False, suffix=".html", mode='w', encoding='utf-8')
-            temp_html.write(html_content)
-            temp_html.close()
-            driver.get(f'file://{temp_html.name}')
-        else:
-            driver.get(f"data:text/html;charset=utf-8,{quote(html_content)}")
-        
-        # Wait for page to load
-        time.sleep(1)
-        
-        # Get the ticket container element
-        ticket_element = driver.find_element(By.CLASS_NAME, "ticket-container")
-        
-        if retain_file:
-            temp_img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            temp_img.close()
-            ticket_element.screenshot(temp_img.name)
-            with open(temp_img.name, "rb") as f:
-                img_bytes = f.read()
-            driver.quit()
-            logger.info("Task card rendered via Selenium: %s", temp_img.name)
-            return temp_img.name, img_bytes
-
-        img_bytes = ticket_element.screenshot_as_png
-        driver.quit()
-        return None, img_bytes
-        
-    except Exception as e:
-        logger.exception("Selenium conversion failed")
-        return None, None
-
-
 def create_task_image(task_data, retain_file=True):
     """Create task card image from HTML, optionally avoiding filesystem writes."""
     html_content = create_task_html(task_data)
 
-    logger.info("Starting task card image render; retain_file=%s", retain_file)
-    image_path, image_bytes = html_to_image_imgkit(html_content, retain_file=retain_file)
-
-    if image_bytes is None:
-        logger.info("Falling back to Selenium for task card render")
-        image_path, image_bytes = html_to_image_selenium(html_content, retain_file=retain_file)
-    else:
-        logger.info("imgkit render succeeded; skipping Selenium fallback")
-
-    if image_bytes is None:
-        logger.warning("Task card render failed in both imgkit and Selenium")
-
-    return image_path, image_bytes
+    return html_to_image(html_content, retain_file=retain_file)
 
 
 def create_task_html_image(task_data):
@@ -600,19 +463,7 @@ def create_quote_image(quote: str, author: str = "", tagline: str = "", date_str
     """Create quote receipt image from HTML."""
     html_content = create_quote_html(quote=quote, author=author, tagline=tagline, date_str=date_str, zh_tw=zh_tw)
 
-    logger.info("Starting quote image render; retain_file=%s", retain_file)
-    image_path, image_bytes = html_to_image_imgkit(html_content, retain_file=retain_file)
-
-    if image_bytes is None:
-        logger.info("Falling back to Selenium for quote render")
-        image_path, image_bytes = html_to_image_selenium(html_content, retain_file=retain_file)
-    else:
-        logger.info("imgkit render succeeded; skipping Selenium fallback")
-
-    if image_bytes is None:
-        logger.warning("Quote render failed in both imgkit and Selenium")
-
-    return image_path, image_bytes
+    return html_to_image(html_content, retain_file=retain_file)
 
 
 def create_todolist_html(title, items):
@@ -624,12 +475,13 @@ def create_todolist_html(title, items):
     items_html = ""
     for i, item in enumerate(items):
         item_safe = html.escape(item)
-        border_style = 'border-bottom: 2px dotted #999;' if i < len(items) - 1 else ''
+        separator = '<div style="height: 2px; margin: 0 4px; background: repeating-linear-gradient(to right, #999 0, #999 2px, transparent 2px, transparent 4px);"></div>' if i < len(items) - 1 else ''
         items_html += f"""
-        <div style="display: flex; align-items: flex-start; padding: 8px 4px; {border_style}">
+        <div style="display: flex; align-items: flex-start; padding: 8px 4px;">
             <div style="width: 28px; height: 28px; min-width: 28px; border: 3px solid #000; border-radius: 3px; margin-top: 1px; margin-right: 16px;"></div>
             <div style="font-size: 22px; color: #000; line-height: 1.4; word-wrap: break-word; overflow-wrap: break-word;">{item_safe}</div>
         </div>
+        {separator}
         """
 
     title_block = ""
@@ -694,16 +546,4 @@ def create_todolist_image(title, items, retain_file=True):
     """Create todolist image from HTML, optionally avoiding filesystem writes."""
     html_content = create_todolist_html(title, items)
 
-    logger.info("Starting todolist image render; retain_file=%s", retain_file)
-    image_path, image_bytes = html_to_image_imgkit(html_content, retain_file=retain_file)
-
-    if image_bytes is None:
-        logger.info("Falling back to Selenium for todolist render")
-        image_path, image_bytes = html_to_image_selenium(html_content, retain_file=retain_file)
-    else:
-        logger.info("imgkit render succeeded; skipping Selenium fallback")
-
-    if image_bytes is None:
-        logger.warning("Todolist render failed in both imgkit and Selenium")
-
-    return image_path, image_bytes
+    return html_to_image(html_content, retain_file=retain_file)

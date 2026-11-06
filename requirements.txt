@@ -4,5 +4,4 @@ python-dotenv
 python-multipart
 pillow
 python-escpos
-imgkit
-selenium
+fullbleed==2.5.51

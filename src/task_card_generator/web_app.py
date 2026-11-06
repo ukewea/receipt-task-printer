@@ -169,7 +169,7 @@ async def handle_print(
             return JSONResponse(
                 {
                     "success": False,
-                    "error": "Failed to render ticket image. Ensure wkhtmltoimage or Selenium+Chrome are installed.",
+                    "error": "Failed to render ticket image. Check Fullbleed renderer logs and RECEIPT_FONT_DIR.",
                 },
                 status_code=500,
             )
@@ -235,7 +235,7 @@ async def handle_print_quote(request: Request):
         return JSONResponse(
             {
                 "success": False,
-                "error": "Failed to render quote image. Ensure wkhtmltoimage or Selenium+Chrome are installed.",
+                "error": "Failed to render quote image. Check Fullbleed renderer logs and RECEIPT_FONT_DIR.",
             },
             status_code=500,
         )
@@ -285,7 +285,7 @@ async def handle_print_todolist(request: Request):
         return JSONResponse(
             {
                 "success": False,
-                "error": "Failed to render todolist image. Ensure wkhtmltoimage or Selenium+Chrome are installed.",
+                "error": "Failed to render todolist image. Check Fullbleed renderer logs and RECEIPT_FONT_DIR.",
             },
             status_code=500,
         )
